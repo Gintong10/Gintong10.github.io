@@ -4,7 +4,8 @@ const MAX_PLAYERS=6;
 const ARENA_W=640,ARENA_H=480;
 function code(){return Math.random().toString(36).slice(2,8).toUpperCase()}
 const server=http.createServer((req,res)=>{
-  if(req.url==='/'||req.url==='/index.html'){res.writeHead(200,{'Content-Type':'text/html'});res.end(fs.readFileSync('index.html','utf8'));return}
+  const u=req.url.split('?')[0];
+  if(u==='/'||u==='/index.html'||u.startsWith('/join/')){res.writeHead(200,{'Content-Type':'text/html'});res.end(fs.readFileSync('index.html','utf8'));return}
   res.writeHead(404);res.end();
 });
 const wss=new WebSocket.Server({server});
@@ -54,7 +55,7 @@ function tick(roomCode){
   for(const id of Object.keys(r.monsters)){
     const m=r.monsters[id];
     m.size=Math.max(5,m.baseSize*(m.hp/m.maxHp));
-    m.speed=m.baseSpeed*(1+(1-m.hp/m.maxHp)*0.8);
+    m.speed=m.baseSpeed*(1+(1-m.hp/m.maxHp)*2.5);
     m.x+=m.vx*m.speed;m.y+=m.vy*m.speed;
     const b=m.size*2;
     if(m.x<b||m.x>ARENA_W-b)m.vx*=-1;
