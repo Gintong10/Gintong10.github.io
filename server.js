@@ -489,7 +489,7 @@ wss.on('connection', ws => {
               const d = Math.hypot(v[i][0] - me.x, v[i][1] - me.y);
               if (d > maxDist) maxDist = d;
             }
-            const abilityRadius = Math.max(60, maxDist * 2);
+            const abilityRadius = Math.max(100, maxDist * 4);
             me.abilityRadius = abilityRadius; // Store for client
             // AoE damage pulse
             for (const id of Object.keys(r.monsters)) {

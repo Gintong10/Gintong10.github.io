@@ -426,7 +426,7 @@
                 m.abilityCooldown = 600;
                 if (m.ability === 'spikeBurst') {
                     for (var oid in monsters) {
-                        if (oid != id && monsters[oid].hp > 0 && Math.hypot(monsters[oid].x - m.x, monsters[oid].y - m.y) < 150) {
+                        if (oid != id && monsters[oid].hp > 0 && Math.hypot(monsters[oid].x - m.x, monsters[oid].y - m.y) < 250) {
                             monsters[oid].hp -= 20; floatTexts.push({ x: monsters[oid].x, y: monsters[oid].y - 20, text: '-20', color: '#f00', age: 0 })
                         }
                     }
