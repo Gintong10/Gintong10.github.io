@@ -1,4 +1,4 @@
-<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no"><title>Spell Cat</title><style>*{margin:0;padding:0}body{background:#1a0a2e;overflow:hidden;touch-action:none;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}#c{background:#2d1b4e;border-radius:8px;display:block;cursor:crosshair;max-width:100%;max-height:70vh;touch-action:none}#s{color:#e8c4ff;font:14px sans-serif;margin-top:8px;text-align:center}</style></head><body><canvas id=c width=280 height=400></canvas><div id=s>— line ○ circle ~ zigzag. Draw on ghosts!</div><script>
+<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no"><title>Spell Cat</title><style>*{margin:0;padding:0}body{background:#1a0a2e;overflow:hidden;touch-action:none;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}#c{background:#2d1b4e;border-radius:8px;display:block;cursor:crosshair;max-width:100%;max-height:70vh;touch-action:none}#s{color:#e8c4ff;font:14px sans-serif;margin-top:8px;text-align:center}</style></head><body><canvas id=c width=280 height=400></canvas><div id=s>— line ○ circle ~ zigzag. Draw to banish!</div><script>
 (function(){
 var c=document.getElementById('c'),s=document.getElementById('s'),x=c.getContext('2d');
 var W=280,H=400,path=[],ghosts=[],lives=3,score=0,wave=0;
@@ -30,13 +30,8 @@ if(w>h*1.5||h>w*1.5)return 0;
 return -1;
 }
 function hit(shape){
-var cx=0,cy=0;for(var i=0;i<path.length;i++){cx+=path[i].x;cy+=path[i].y}
-cx/=path.length;cy/=path.length;
-var d=100,t=-1;
-for(var i=0;i<ghosts.length;i++){
-var dist=Math.hypot(ghosts[i].x-cx,ghosts[i].y-cy);
-if(ghosts[i].sym===shape&&dist<d){d=dist;t=i}}
-return t;
+for(var i=0;i<ghosts.length;i++)if(ghosts[i].sym===shape)return i;
+return -1;
 }
 function gameLoop(){
 drawBG();
@@ -68,7 +63,7 @@ var shape=analyze(path);
 if(shape>=0){
 var idx=hit(shape);
 if(idx>=0){ghosts.splice(idx,1);score+=10;if(score%50===0&&score>0)wave++}
-else s.textContent='Miss! Draw on ghosts';
+else s.textContent='No ghost with that symbol!';
 }
 path=[];
 }
@@ -80,6 +75,6 @@ c.addEventListener('mousemove',function(e){if(e.buttons)onMove(e)});
 c.addEventListener('mouseup',onUp);
 c.addEventListener('mouseleave',function(){if(path.length)path=[]});
 gameLoop();
-document.addEventListener('click',function(){if(lives<=0){lives=3;score=0;wave=0;ghosts=[];s.textContent='— line ○ circle ~ zigzag. Draw on ghosts!';gameLoop()}});
+document.addEventListener('click',function(){if(lives<=0){lives=3;score=0;wave=0;ghosts=[];s.textContent='— line ○ circle ~ zigzag. Draw to banish!';gameLoop()}});
 })();
 </script></body></html>
