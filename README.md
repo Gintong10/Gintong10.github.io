@@ -67,6 +67,27 @@ Watch out for hazards appearing later in the match:
 - **Build Command:** `npm install`
 - **Start Command:** `npm start`
 
+## Contest Entry (Offline Mode)
+
+This repository includes a standalone, offline-compatible version of the game designed for the 15KB challenge.
+
+- **Artifact:** `shadow-puppet-arena.tar.gz` (contains `dist/index.html`)
+- **Bundle Size:** ~8.3 KB (well under the 15KB limit)
+- **Features:**
+  - Single-player vs AI opponents (No network requests)
+  - Full game mechanics (drawing, physics, abilities, power-ups, hazards)
+  - Works completely offline (tested with `verify.ps1`)
+
+### How to Verify (Contest Script)
+
+1. Ensure `shadow-puppet-arena.tar.gz` is in the directory.
+2. Run the contest verification script:
+   ```powershell
+   ./verify.ps1 shadow-puppet-arena.tar.gz
+   ```
+   *(Note: The script serves on port 8080)*
+
 ## Bundle Size
 
-Game: ~10 KB (under 15 KB requirement)
+Online Version: ~30 KB (uncompressed)
+**Contest Offline Version:** ~8.3 KB (Compressed .tar.gz)

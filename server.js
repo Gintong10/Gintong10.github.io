@@ -219,7 +219,7 @@ function tick(roomCode) {
       const m = r.monsters[id];
       if (Math.hypot(m.x - lw.x, m.y - lw.y) < 60 && !m.effects.shield) {
         m.hp -= 25;
-        r.floatTexts.push({ x: m.x, y: m.y - 30, text: '-25⚡', color: '#ff0' });
+        r.floatTexts.push({ x: m.x, y: m.y - 30, text: '-25', color: '#ff0' });
         logs.push(m.name + ' struck by lightning!');
       }
     }
@@ -355,8 +355,8 @@ function tick(roomCode) {
         const dmgA = a.effects.shield ? 0 : Math.min(25, Math.max(1, Math.round(baseDmgA * velMultB)));
         const dmgB = b.effects.shield ? 0 : Math.min(25, Math.max(1, Math.round(baseDmgB * velMultA)));
         a.hp -= dmgA; b.hp -= dmgB; a.iframes = 20; b.iframes = 20;
-        if (dmgA > 0) r.floatTexts.push({ x: a.x, y: a.y - 20, text: '-' + dmgA + (velMultB > 1.2 ? '💨' : ''), color: velMultB > 1.2 ? '#ff0' : '#f55' });
-        if (dmgB > 0) r.floatTexts.push({ x: b.x, y: b.y - 20, text: '-' + dmgB + (velMultA > 1.2 ? '💨' : ''), color: velMultA > 1.2 ? '#ff0' : '#f55' });
+        if (dmgA > 0) r.floatTexts.push({ x: a.x, y: a.y - 20, text: '-' + dmgA, color: velMultB > 1.2 ? '#ff0' : '#f55' });
+        if (dmgB > 0) r.floatTexts.push({ x: b.x, y: b.y - 20, text: '-' + dmgB, color: velMultA > 1.2 ? '#ff0' : '#f55' });
         // Absorb ability: heal on hit
         if (a.ability === 'absorb' && dmgB > 0) a.hp = Math.min(a.maxHp, a.hp + Math.floor(dmgB / 2));
         if (b.ability === 'absorb' && dmgA > 0) b.hp = Math.min(b.maxHp, b.hp + Math.floor(dmgA / 2));
@@ -369,7 +369,7 @@ function tick(roomCode) {
     if (r.monsters[id].hp <= 0) {
       const dead = r.monsters[id];
       logs.push(dead.name + ' defeated!');
-      r.floatTexts.push({ x: dead.x, y: dead.y, text: '💀', color: '#fff' });
+      r.floatTexts.push({ x: dead.x, y: dead.y, text: 'KO', color: '#fff' });
       r.kills.push({ name: dead.name, x: dead.x, y: dead.y });
       // Spawn death explosion particles
       for (let pi = 0; pi < 12; pi++) {

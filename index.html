@@ -213,28 +213,30 @@
             document.getElementById('create').onclick = createGame;
             document.getElementById('join').onclick = joinGame;
             function analyze() {
-                var ctx = c.getContext('2d'), id = ctx.getImageData(0, 0, W, H), d = id.data;
-                var area = 0; for (var i = 0; i < d.length; i += 4)if (d[i] > 200) area++;
-                var pts = path; if (path.length > 25) { pts = []; for (var i = 0; i < 20; i++)pts.push(path[Math.floor(i * (path.length - 1) / 19)]) }
-                var corners = 0; for (var i = 2; i < pts.length; i++) { var a = Math.atan2(pts[i].y - pts[i - 1].y, pts[i].x - pts[i - 1].x), b = Math.atan2(pts[i - 1].y - pts[i - 2].y, pts[i - 1].x - pts[i - 2].x); var diff = Math.abs(a - b); if (diff > Math.PI) diff = 2 * Math.PI - diff; if (diff > 1.0) corners++ }
+                var p = path;
+                var pts = []; for (var i = 0; i < p.length; i++) pts.push({ x: p[i].x, y: p[i].y });
+                if (pts.length > 25) { var np = []; for (var i = 0; i < 20; i++)np.push(pts[Math.floor(i * (pts.length - 1) / 19)]); pts = np }
+                var corners = 0; for (var i = 2; i < pts.length; i++) {
+                    var a = Math.atan2(pts[i].y - pts[i - 1].y, pts[i].x - pts[i - 1].x), b = Math.atan2(pts[i - 1].y - pts[i - 2].y, pts[i - 1].x - pts[i - 2].x);
+                    var diff = Math.abs(a - b); if (diff > Math.PI) diff = 2 * Math.PI - diff; if (diff > 1.0) corners++
+                }
                 var cx = 0, cy = 0; for (var i = 0; i < pts.length; i++) { cx += pts[i].x; cy += pts[i].y } cx /= pts.length; cy /= pts.length;
                 var left = 0, right = 0; for (var i = 0; i < pts.length; i++) { var v = pts[i].y - cy; if (pts[i].x < cx) left += v * v; else right += v * v }
                 var sym = Math.min(1, 1 - Math.abs(left - right) / (left + right + 1));
                 var segs = []; for (var i = 1; i < pts.length; i++)segs.push(Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
                 var avg = segs.reduce(function (a, b) { return a + b }, 0) / segs.length; var legs = 0; for (var i = 0; i < segs.length; i++)if (segs[i] > avg * 1.8) legs++;
+
                 var mx = 1e9, my = 1e9, Mx = 0, My = 0; for (var i = 0; i < pts.length; i++) { mx = Math.min(mx, pts[i].x); my = Math.min(my, pts[i].y); Mx = Math.max(Mx, pts[i].x); My = Math.max(My, pts[i].y) }
                 var sw = Mx - mx || 1, sh = My - my || 1, sc = Math.min(220 / sw, 220 / sh), ox = 150 - (mx + Mx) / 2 * sc, oy = 150 - (my + My) / 2 * sc;
-                var p = []; var ns = Math.min(pts.length, 20); for (var i = 0; i < ns; i++) { var j = Math.floor(i * (pts.length - 1) / (ns - 1)); p.push([Math.round((pts[j].x * sc + ox) / 12), Math.round((pts[j].y * sc + oy) / 12)]) }
-                return { a: area, c: corners, s: sym, l: legs, p: p, n: (document.getElementById('mname').value || '???').slice(0, 12) }
+                var outP = []; var ns = Math.min(pts.length, 20); for (var i = 0; i < ns; i++) { var j = Math.floor(i * (pts.length - 1) / (ns - 1)); outP.push([Math.round((pts[j].x * sc + ox) / 12), Math.round((pts[j].y * sc + oy) / 12)]) }
+                return { a: 0, c: corners, s: sym, l: legs, p: outP, n: (document.getElementById('mname').value || '???').slice(0, 12) }
             }
             function drawMonster() {
                 var ctx = c.getContext('2d'), pts = path;
                 if (pts.length < 3) return null;
-                ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, W, H);
-                ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (var i = 1; i < pts.length; i++)ctx.lineTo(pts[i].x, pts[i].y); ctx.closePath(); ctx.fill('evenodd');
                 var stats = analyze();
                 ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, W, H);
-                ctx.fillStyle = myColor; ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (var i = 1; i < pts.length; i++)ctx.lineTo(pts[i].x, pts[i].y); ctx.closePath(); ctx.fill('evenodd');
+                ctx.fillStyle = myColor; ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (var i = 1; i < pts.length; i++)ctx.lineTo(pts[i].x, pts[i].y); ctx.closePath(); ctx.fill();
                 var name = document.getElementById('mname').value || '';
                 if (name) { ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(name, W / 2, 20) }
                 return stats
@@ -312,7 +314,7 @@
                     ctx.fillStyle = m.effects && m.effects.ghost ? 'rgba(255,255,255,0.3)' : m.color; ctx.beginPath();
                     ctx.moveTo((m.path[0][0] * 12 - pcx), (m.path[0][1] * 12 - pcy));
                     for (var i = 1; i < m.path.length; i++) ctx.lineTo((m.path[i][0] * 12 - pcx), (m.path[i][1] * 12 - pcy));
-                    ctx.closePath(); ctx.fill('evenodd');
+                    ctx.closePath(); ctx.fill();
                     ctx.restore();
                     ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.max(10, Math.round(12 * sc)) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                     ctx.fillText(Math.ceil(m.hp), m.x, m.y);
@@ -382,6 +384,7 @@
                 if (path.length < 10 || isReady) return; path = smooth(path);
                 var gap = Math.hypot(path[0].x - path[path.length - 1].x, path[0].y - path[path.length - 1].y);
                 if (gap > 5) { var steps = Math.max(2, Math.ceil(gap / 10)); var ex = path[path.length - 1].x, ey = path[path.length - 1].y; for (var i = 1; i <= steps; i++) { var t = i / steps; path.push({ x: ex * (1 - t) + path[0].x * t, y: ey * (1 - t) + path[0].y * t }) } }
+                path.push({ x: path[0].x, y: path[0].y });
                 document.getElementById('drawStatus').textContent = 'Shape ready!'; document.getElementById('drawStatus').style.color = '#2ecc71'; drawMonster()
             }
             c.addEventListener('touchstart', function (e) { e.preventDefault(); onDown(e) });
