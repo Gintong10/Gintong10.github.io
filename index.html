@@ -159,7 +159,8 @@
             height=300></canvas>
         <p class=hint>Draw in ONE stroke. Shape will auto-close.</p>
         <p id=drawStatus style=margin:4px>Draw your monster</p><button id=loadPrev
-            style=display:none;background:#2980b9>Load Previous</button><button id=clear>Clear</button><button
+            style=display:none;background:#2980b9>Load Previous</button><button id=loadScotty
+            style=background:#c0392b;margin-left:4px>Load Scotty 🐕</button><button id=clear>Clear</button><button
             id=done>Ready!</button><button id=unready style=display:none;background:#666>Unready</button>
     </div>
     <div id=arena><canvas id=ac width=640 height=480></canvas>
@@ -169,10 +170,10 @@
     </div>
     <script>
         (function () {
-            var lobby = document.getElementById('lobby'), ui = document.getElementById('ui'), arena = document.getElementById('arena'), c = document.getElementById('c'), ac = document.getElementById('ac'), msg = document.getElementById('msg'), room = document.getElementById('room'), count = document.getElementById('count'), qr = document.getElementById('qr'), done = document.getElementById('done'), unready = document.getElementById('unready'), log = document.getElementById('log'), blastBtn = document.getElementById('blastBtn'), clearBtn = document.getElementById('clear'), loadPrevBtn = document.getElementById('loadPrev'), abilityBtn = document.getElementById('abilityBtn');
+            var lobby = document.getElementById('lobby'), ui = document.getElementById('ui'), arena = document.getElementById('arena'), c = document.getElementById('c'), ac = document.getElementById('ac'), msg = document.getElementById('msg'), room = document.getElementById('room'), count = document.getElementById('count'), qr = document.getElementById('qr'), done = document.getElementById('done'), unready = document.getElementById('unready'), log = document.getElementById('log'), blastBtn = document.getElementById('blastBtn'), clearBtn = document.getElementById('clear'), loadPrevBtn = document.getElementById('loadPrev'), loadScottyBtn = document.getElementById('loadScotty'), abilityBtn = document.getElementById('abilityBtn');
             var W = 300, H = 300, path = [], playerId = 0, myColor = '#6a4c93', monsters = {}, packs = [], powerups = [], hazards = [], particles = [], ws, isReady = false, bounds = [0, 0, 640, 480];
             var blastCooldown = 0, abilityCooldown = 0, blastFx = [], floatTexts = [], isDead = false, hasSavedShape = false, savedPath = [];
-            var lightningWarning = null, lightningStrike = null, suddenDeath = false, myAbility = 'none', teamMode = false;
+            var lightningWarning = null, lightningStrike = null, suddenDeath = false, myAbility = 'none', teamMode = false, isScotty = false;
             var WS_URL = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + (location.host || 'localhost:3000');
             var retries = 0;
             function post(m) { msg.textContent = m; msg.style.color = '#888' }
@@ -229,6 +230,7 @@
                 var mx = 1e9, my = 1e9, Mx = 0, My = 0; for (var i = 0; i < pts.length; i++) { mx = Math.min(mx, pts[i].x); my = Math.min(my, pts[i].y); Mx = Math.max(Mx, pts[i].x); My = Math.max(My, pts[i].y) }
                 var sw = Mx - mx || 1, sh = My - my || 1, sc = Math.min(220 / sw, 220 / sh), ox = 150 - (mx + Mx) / 2 * sc, oy = 150 - (my + My) / 2 * sc;
                 var outP = []; var ns = Math.min(pts.length, 20); for (var i = 0; i < ns; i++) { var j = Math.floor(i * (pts.length - 1) / (ns - 1)); outP.push([Math.round((pts[j].x * sc + ox) / 12), Math.round((pts[j].y * sc + oy) / 12)]) }
+                if (isScotty) return { a: 999, c: 20, s: 1.0, l: 5, p: outP, n: 'Scotty' };
                 return { a: 0, c: corners, s: sym, l: legs, p: outP, n: (document.getElementById('mname').value || '???').slice(0, 12) }
             }
             function drawMonster() {
@@ -383,9 +385,32 @@
                 drawMonster();
                 document.getElementById('drawStatus').textContent = 'Previous shape loaded!'; document.getElementById('drawStatus').style.color = '#2ecc71'
             };
+            loadScottyBtn.onclick = function () {
+                if (isReady) return;
+                // Scotty dog path (approximate profile)
+                path = [
+                    { x: 270, y: 100 }, { x: 270, y: 140 }, { x: 240, y: 140 }, // Beard
+                    { x: 220, y: 160 }, { x: 220, y: 230 }, // Chest/FrontLeg
+                    { x: 200, y: 230 }, { x: 180, y: 190 }, // FrontLegBack
+                    { x: 120, y: 190 }, { x: 100, y: 230 }, // Belly/BackLeg
+                    { x: 60, y: 230 }, { x: 70, y: 160 }, // BackLegBack/Rump
+                    { x: 50, y: 100 }, { x: 60, y: 80 }, { x: 70, y: 140 }, // Tail
+                    { x: 180, y: 140 }, // Back
+                    { x: 180, y: 70 }, { x: 200, y: 40 }, { x: 220, y: 70 }, // Ear 1
+                    { x: 240, y: 70 }, // Forehead
+                    { x: 270, y: 100 } // Nose connect
+                ];
+                // Smooth slightly
+                path = smooth(path);
+                path.push({ x: path[0].x, y: path[0].y }); // Close
+                isScotty = true;
+                document.getElementById('mname').value = 'Scotty';
+                drawMonster();
+                document.getElementById('drawStatus').textContent = 'Scotty Loaded!'; document.getElementById('drawStatus').style.color = '#c0392b';
+            };
             function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
             function getXY(e) { var r = c.getBoundingClientRect(), sx = W / r.width, sy = H / r.height; var px = (e.touches ? e.touches[0].clientX : e.clientX) - r.left, py = (e.touches ? e.touches[0].clientY : e.clientY) - r.top; return { x: clamp(px * sx, 5, W - 5), y: clamp(py * sy, 5, H - 5) } }
-            function onDown(e) { if (isReady) return; var p = getXY(e); path = [p] }
+            function onDown(e) { if (isReady) return; isScotty = false; var p = getXY(e); path = [p] }
             function smooth(p) { for (var k = 0; k < 2; k++) { var n = []; for (var i = 0; i < p.length; i++) { var a = p[i - 1] || p[0], b = p[i], cc = p[i + 1] || p[p.length - 1]; n.push({ x: (a.x + b.x * 2 + cc.x) / 4, y: (a.y + b.y * 2 + cc.y) / 4 }) } p = n } return p }
             function onMove(e) {
                 if (path.length === 0 || isReady) return; var p = getXY(e); path.push(p); var draw = smooth(path.slice()); var ctx = c.getContext('2d'); ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, W, H); ctx.strokeStyle = myColor; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(draw[0].x, draw[0].y); for (var i = 1; i < draw.length; i++)ctx.lineTo(draw[i].x, draw[i].y); ctx.stroke();
