@@ -2,7 +2,7 @@ const http=require('http'),WebSocket=require('ws'),fs=require('fs');
 const rooms={};
 const MAX_PLAYERS=6;
 const ARENA_W=640,ARENA_H=480;
-const MAX_HP=150,BASE_SIZE=30,MIN_SPEED=0.8,MAX_VEL=6;
+const MAX_HP=150,BASE_SIZE=30,MIN_SPEED=0.2,MAX_VEL=1.5;
 function code(){var s='';for(var i=0;i<4;i++)s+='ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0];return s}
 const server=http.createServer((req,res)=>{
   const u=req.url.split('?')[0];
@@ -31,9 +31,9 @@ function startArena(roomCode){
     const hp=Math.min(MAX_HP,Math.max(60,Math.floor(m.a/25)));
     r.monsters[pid]={
       x:r.arenaL+80+Math.random()*(ARENA_W-160),y:r.arenaT+60+Math.random()*(ARENA_H-120),
-      vx:(Math.random()-0.5)*2,vy:(Math.random()-0.5)*2,
-      path:m.p,name:m.n||'???',baseSize:BASE_SIZE,size:BASE_SIZE,hp:hp,maxHp:hp,iframes:0,
-      spikes:Math.min(m.c,5),stability:Math.min(m.s*3,2),baseSpeed:1+Math.min(m.l*0.3,1.5),speed:0,
+      vx:(Math.random()-0.5)*0.5,vy:(Math.random()-0.5)*0.5,
+      path:m.p,name:m.n||'???',baseSize:BASE_SIZE,size:BASE_SIZE,hp:hp,maxHp:hp,
+      spikes:Math.min(m.c,5),stability:Math.min(m.s*3,2),baseSpeed:0.2+Math.min(m.l*0.06,0.3),speed:0,
       color:r.colors[pid]||'#9b59b6'
     };
     r.monsters[pid].speed=Math.max(MIN_SPEED,r.monsters[pid].baseSpeed);
@@ -67,10 +67,10 @@ function clampBounds(m,r){
   const v=verts(m);
   let mnX=Infinity,mxX=-Infinity,mnY=Infinity,mxY=-Infinity;
   for(let i=0;i<v.length;i++){mnX=Math.min(mnX,v[i][0]);mxX=Math.max(mxX,v[i][0]);mnY=Math.min(mnY,v[i][1]);mxY=Math.max(mxY,v[i][1])}
-  if(mnX<r.arenaL){m.x+=r.arenaL-mnX;m.vx=Math.abs(m.vx)+0.5}
-  if(mxX>r.arenaR){m.x-=mxX-r.arenaR;m.vx=-(Math.abs(m.vx)+0.5)}
-  if(mnY<r.arenaT){m.y+=r.arenaT-mnY;m.vy=Math.abs(m.vy)+0.5}
-  if(mxY>r.arenaB){m.y-=mxY-r.arenaB;m.vy=-(Math.abs(m.vy)+0.5)}
+  if(mnX<r.arenaL){m.x+=r.arenaL-mnX;m.vx=Math.abs(m.vx)+0.1}
+  if(mxX>r.arenaR){m.x-=mxX-r.arenaR;m.vx=-(Math.abs(m.vx)+0.1)}
+  if(mnY<r.arenaT){m.y+=r.arenaT-mnY;m.vy=Math.abs(m.vy)+0.1}
+  if(mxY>r.arenaB){m.y-=mxY-r.arenaB;m.vy=-(Math.abs(m.vy)+0.1)}
 }
 
 function tick(roomCode){
@@ -78,14 +78,14 @@ function tick(roomCode){
   if(!r||!r.monsters||r.done)return;
   r.tick=(r.tick||0)+1;
   const logs=[];
-  // Speed boost every 6s (75 ticks at 80ms)
-  if(r.tick%75===0){
-    for(const id of Object.keys(r.monsters))r.monsters[id].baseSpeed+=0.15;
+  // Speed boost every 6s (375 ticks at 16ms)
+  if(r.tick%375===0){
+    for(const id of Object.keys(r.monsters))r.monsters[id].baseSpeed+=0.03;
     logs.push('Speed up!');
   }
   // Shrink arena - increments grow over time
-  if(r.tick%125===0&&(r.arenaR-r.arenaL)>200){
-    var phase=Math.floor(r.tick/125);
+  if(r.tick%625===0&&(r.arenaR-r.arenaL)>200){
+    var phase=Math.floor(r.tick/625);
     var shrinkX=Math.min(15,5+phase);
     var shrinkY=Math.min(12,4+Math.floor(phase*0.8));
     r.arenaL+=shrinkX;r.arenaT+=shrinkY;r.arenaR-=shrinkX;r.arenaB-=shrinkY;
@@ -94,8 +94,8 @@ function tick(roomCode){
     logs.push('Arena shrinks!');
     for(const id of Object.keys(r.monsters))clampBounds(r.monsters[id],r);
   }
-  // Spawn health pack every 15s (187 ticks), max 3 on field
-  if(r.tick%187===0&&r.packs.length<3)spawnPack(r);
+  // Spawn health pack every 15s (935 ticks), max 3 on field
+  if(r.tick%935===0&&r.packs.length<3)spawnPack(r);
   // Process blasts
   if(r.blasts&&r.blasts.length){
     for(const bl of r.blasts){
@@ -104,7 +104,7 @@ function tick(roomCode){
         const dx=m.x-bl.x,dy=m.y-bl.y;
         const dist=Math.hypot(dx,dy)||1;
         if(dist<120){
-          const force=Math.max(1.5,(120-dist)/10);
+          const force=Math.max(0.4,(120-dist)/30);
           m.vx+=dx/dist*force;m.vy+=dy/dist*force;
         }
       }
@@ -112,12 +112,10 @@ function tick(roomCode){
     }
     r.blasts=[];
   }
-  // Tick down iframes
-  for(const id of Object.keys(r.monsters))if(r.monsters[id].iframes>0)r.monsters[id].iframes--;
   for(const id of Object.keys(r.monsters)){
     const m=r.monsters[id];
     m.size=Math.max(8,m.baseSize*(m.hp/m.maxHp));
-    m.speed=Math.max(MIN_SPEED,m.baseSpeed*(1+(1-m.hp/m.maxHp)*2.5));
+    m.speed=Math.max(MIN_SPEED,m.baseSpeed*(1+(1-m.hp/m.maxHp)*2));
     m.hp=Math.min(m.hp,m.maxHp);
     // Ensure minimum velocity magnitude
     const curV=Math.hypot(m.vx,m.vy);
@@ -146,19 +144,17 @@ function tick(roomCode){
     for(let j=i+1;j<ids.length;j++){
       const a=r.monsters[ids[i]],b=r.monsters[ids[j]];
       if(!a||!b)continue;
-      if(a.iframes>0||b.iframes>0)continue;
       if(!polyOverlap(a,b))continue;
       const dx=b.x-a.x,dy=b.y-a.y,dist=Math.hypot(dx,dy)||0.1;
       const nx=dx/dist,ny=dy/dist;
       const dmgA=Math.min(15,Math.max(1,Math.round((b.spikes-a.stability)*3)));
       const dmgB=Math.min(15,Math.max(1,Math.round((a.spikes-b.stability)*3)));
       a.hp-=dmgA;b.hp-=dmgB;
-      a.iframes=8;b.iframes=8;
       logs.push(a.name+' -'+dmgA+' / '+b.name+' -'+dmgB);
-      const push=Math.max(0.5,(a.spikes-b.stability+b.spikes-a.stability)*0.3);
+      const push=Math.max(0.15,(a.spikes-b.stability+b.spikes-a.stability)*0.08);
       a.vx-=nx*push;a.vy-=ny*push;
       b.vx+=nx*push;b.vy+=ny*push;
-      const sep=(a.size+b.size)*0.4;
+      const sep=(a.size+b.size)*0.1;
       a.x-=nx*sep;a.y-=ny*sep;b.x+=nx*sep;b.y+=ny*sep;
       clampBounds(a,r);clampBounds(b,r);
     }
@@ -208,9 +204,10 @@ wss.on('connection',ws=>{
       r.players.forEach(p=>p.send(JSON.stringify({t:'status',ready:ready,total:r.players.length})));
     }else if(d.t==='blast'&&ws.room){
       const r=rooms[ws.room];
-      if(r&&r.monsters&&!r.done&&typeof d.x==='number'&&typeof d.y==='number'){
+      if(r&&r.monsters&&!r.done&&r.monsters[ws.id]){
         if(!r.blasts)r.blasts=[];
-        r.blasts.push({x:d.x,y:d.y,by:ws.id});
+        const me=r.monsters[ws.id];
+        r.blasts.push({x:me.x,y:me.y,by:ws.id});
       }
     }}
     catch(e){}
@@ -226,5 +223,5 @@ wss.on('connection',ws=>{
     }
   });
 });
-setInterval(()=>{for(const c of Object.keys(rooms))tick(c)},80);
+setInterval(()=>{for(const c of Object.keys(rooms))tick(c)},16);
 server.listen(process.env.PORT||3000);

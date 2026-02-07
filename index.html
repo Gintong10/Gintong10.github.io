@@ -2,7 +2,7 @@
 (function(){
 var lobby=document.getElementById('lobby'),ui=document.getElementById('ui'),arena=document.getElementById('arena'),c=document.getElementById('c'),ac=document.getElementById('ac'),msg=document.getElementById('msg'),room=document.getElementById('room'),count=document.getElementById('count'),qr=document.getElementById('qr'),done=document.getElementById('done'),unready=document.getElementById('unready'),log=document.getElementById('log'),blastBtn=document.getElementById('blastBtn');
 var W=300,H=300,path=[],playerId=0,myColor='#6a4c93',monsters={},packs=[],ws,isReady=false,bounds=[0,0,640,480];
-var blastMode=false,blastCooldown=0;
+var blastCooldown=0;
 var WS_URL=(location.protocol==='https:'?'wss:':'ws:')+'//'+(location.host||'localhost:3000');
 var retries=0;
 function post(m){msg.textContent=m;msg.style.color='#888'}
@@ -80,8 +80,6 @@ ctx.fillStyle='#fff';ctx.font='bold '+Math.max(10,Math.round(12*sc))+'px sans-se
 ctx.fillText(Math.ceil(m.hp),m.x,m.y);
 if(m.name){ctx.font=Math.max(9,Math.round(10*sc))+'px sans-serif';ctx.fillText(m.name,m.x,m.y-m.size*1.5-6)}
 }
-// Blast mode indicator
-if(blastMode){ctx.fillStyle='rgba(192,57,43,0.15)';ctx.fillRect(0,0,640,480);ctx.fillStyle='#e74c3c';ctx.font='bold 16px sans-serif';ctx.textAlign='center';ctx.fillText('TAP TO PLACE BLAST',320,30)}
 }
 done.onclick=function(){
 if(path.length<10){document.getElementById('drawStatus').textContent='Draw a shape first';document.getElementById('drawStatus').style.color='#e66';return}
@@ -107,26 +105,13 @@ c.addEventListener('touchend',function(e){e.preventDefault();if(e.touches.length
 c.addEventListener('mousedown',onDown);
 c.addEventListener('mousemove',function(e){if(e.buttons)onMove(e)});
 c.addEventListener('mouseup',onUp);
-// Blast button
+// Blast button - fires from your monster
 blastBtn.onclick=function(){
 if(blastCooldown>0)return;
-blastMode=!blastMode;
-blastBtn.textContent=blastMode?'Cancel blast':'Blast (ready)'};
-function getArenaXY(e){
-var r=ac.getBoundingClientRect();
-var px=(e.touches?e.touches[0].clientX:e.clientX)-r.left;
-var py=(e.touches?e.touches[0].clientY:e.clientY)-r.top;
-return{x:px*(640/r.width),y:py*(480/r.height)}}
-function onArenaClick(e){
-if(!blastMode||blastCooldown>0)return;
-var p=getArenaXY(e);
-ws.send(JSON.stringify({t:'blast',x:p.x,y:p.y}));
-blastMode=false;blastCooldown=10;
-blastBtn.disabled=true;blastBtn.textContent='Blast (10s)';
-var cd=setInterval(function(){blastCooldown--;if(blastCooldown<=0){clearInterval(cd);blastBtn.disabled=false;blastBtn.textContent='Blast (ready)'}else{blastBtn.textContent='Blast ('+blastCooldown+'s)'}},1000)}
-ac.addEventListener('click',onArenaClick);
-ac.addEventListener('touchstart',function(e){if(blastMode){e.preventDefault();onArenaClick(e)}});
-setInterval(function(){if(arena.style.display==='flex'&&Object.keys(monsters).length)renderArena()},33);
+ws.send(JSON.stringify({t:'blast'}));
+blastCooldown=10;blastBtn.disabled=true;blastBtn.textContent='Blast (10s)';
+var cd=setInterval(function(){blastCooldown--;if(blastCooldown<=0){clearInterval(cd);blastBtn.disabled=false;blastBtn.textContent='Blast (ready)'}else{blastBtn.textContent='Blast ('+blastCooldown+'s)'}},1000)};
+setInterval(function(){if(arena.style.display==='flex'&&Object.keys(monsters).length)renderArena()},16);
 connect();
 })();
 </script></body></html>
