@@ -2,6 +2,8 @@
 
 Draw a monster silhouette. Stats come from geometry: **area = HP**, **sharp corners = attack**, **symmetry = defense**, **long legs = speed**.
 
+**Play now:** [https://geometrical-gorlock.onrender.com](https://geometrical-gorlock.onrender.com) *(first load may take ~30 sec on free tier)*
+
 ## Multiplayer
 
 1. **Run the server:** `npm install && npm start`

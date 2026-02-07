@@ -1,14 +1,16 @@
-<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no"><title>Shadow Puppet Monster</title><style>*{margin:0;padding:0}body{background:#0d0d12;color:#e0e0e0;font:14px sans-serif;overflow:hidden;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}#lobby{text-align:center;padding:20px}#lobby input,#lobby button{font-size:16px;padding:10px;margin:5px;border-radius:6px;border:1px solid #444}#lobby button{background:#4a2d8e;color:#fff;cursor:pointer}#c{background:#1a1a24;border-radius:8px;display:none;cursor:crosshair;max-width:95vw;max-height:50vh}#ui{display:none;padding:10px;text-align:center}#battle{display:none;padding:20px;text-align:center}#battle canvas{max-width:100%;margin:10px;border-radius:8px;background:#1a1a24}#log{font-size:12px;max-height:80px;overflow-y:auto;text-align:left;margin-top:10px}</style></head><body><div id=lobby><h1>🦇 Shadow Puppet Monster</h1><p style=margin:10px>Draw a monster. Stats from geometry!</p><button id=create>Create Game</button><br><input id=code placeholder="Game code" maxlength=6><button id=join>Join</button><p id=msg style=margin-top:15px;color:#888></p></div><div id=ui style=display:none><p id=room>Room: -----</p><canvas id=c width=240 height=240></canvas><p id=drawStatus style=margin:8px>Draw your monster silhouette</p><button id=done>Done - Fight!</button></div><div id=battle><h2>⚔️ Battle!</h2><div id=cr></div><div id=log></div></div><script>
+<!DOCTYPE html><html><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1,user-scalable=no"><title>Shadow Puppet Monster</title><style>*{margin:0;padding:0}body{background:#0d0d12;color:#e0e0e0;font:14px sans-serif;overflow:hidden;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center}#lobby{text-align:center;padding:20px}#lobby input,#lobby button{font-size:16px;padding:10px;margin:5px;border-radius:6px;border:1px solid #444}#lobby button{background:#4a2d8e;color:#fff;cursor:pointer}#c{background:#1a1a24;border-radius:8px;display:none;cursor:crosshair;max-width:95vw;max-height:50vh}#ui{display:none;padding:10px;text-align:center}#battle{display:none;padding:20px;text-align:center}#battle canvas{max-width:100%;margin:10px;border-radius:8px;background:#1a1a24}#log{font-size:12px;max-height:80px;overflow-y:auto;text-align:left;margin-top:10px}</style></head><body><div id=lobby><h1>🦇 Shadow Puppet Monster</h1><p style=margin:10px>Draw a monster. Stats from geometry!</p><button id=create>Create Game</button><br><input id=code placeholder="Game code" maxlength=6><button id=join>Join</button><p id=msg style=margin-top:15px;color:#888>Connecting...</p></div><div id=ui style=display:none><p id=room>Room: -----</p><canvas id=c width=240 height=240></canvas><p id=drawStatus style=margin:8px>Draw your monster silhouette</p><button id=done>Done - Fight!</button></div><div id=battle><h2>⚔️ Battle!</h2><div id=cr></div><div id=log></div></div><script>
 (function(){
 var W=240,H=240,lobby=document.getElementById('lobby'),ui=document.getElementById('ui'),battle=document.getElementById('battle'),c=document.getElementById('c'),msg=document.getElementById('msg'),room=document.getElementById('room'),done=document.getElementById('done'),cr=document.getElementById('cr'),log=document.getElementById('log');
 var ws,path=[],gameCode='',playerId=0,players={},me={},opp={};
 var WS_URL=(location.protocol==='https:'?'wss:':'ws:')+'//'+(location.host||'localhost:3000');
 function post(m){msg.textContent=m;msg.style.color='#888'}
 function postErr(m){msg.textContent=m;msg.style.color='#e66'}
+var retries=0;
 function connect(){
-try{ws=new WebSocket(WS_URL);
-ws.onopen=function(){post('Connected')};
-ws.onclose=function(){postErr('Disconnected')};
+try{post(retries?'Retrying...':'Connecting... (first visit may take ~30s)');
+ws=new WebSocket(WS_URL);
+ws.onopen=function(){retries=0;post('Connected! Create or join a game.')};
+ws.onclose=function(){postErr('Disconnected.'+(retries<5?' Retrying...':' Refresh page.'));if(retries<5){retries++;setTimeout(connect,3000)}};
 ws.onmessage=function(e){var d=JSON.parse(e.data);
 if(d.t==='code'){gameCode=d.code;room.textContent='Room: '+gameCode;lobby.querySelector('#code').value=gameCode;post('Share code: '+gameCode)}
 else if(d.t==='joined'){post('Player joined!')}
@@ -17,8 +19,8 @@ else if(d.t==='monster'){players[d.id]=d.m;if(Object.keys(players).length===2)fi
 else if(d.t==='full'){postErr('Room full')}
 else if(d.t==='invalid'){postErr('Invalid code')}}
 }catch(e){postErr('No server. Run server.js')}}
-function createGame(){ws.send(JSON.stringify({t:'create'}))}
-function joinGame(){var code=document.getElementById('code').value.toUpperCase();if(code.length!==6){postErr('Code is 6 chars');return}
+function createGame(){if(ws&&ws.readyState===1)ws.send(JSON.stringify({t:'create'}));else postErr('Connecting...')}
+function joinGame(){if(ws&&ws.readyState!==1){postErr('Connecting...');return}var code=document.getElementById('code').value.toUpperCase();if(code.length!==6){postErr('Code is 6 chars');return}
 ws.send(JSON.stringify({t:'join',code:code}))}
 document.getElementById('create').onclick=createGame;
 document.getElementById('join').onclick=joinGame;

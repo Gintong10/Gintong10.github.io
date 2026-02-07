@@ -26,6 +26,12 @@ wss.on('connection',ws=>{
     }}
     catch(e){}
   });
-  ws.on('close',()=>{if(ws.room&&rooms[ws.room]){delete rooms[ws.room].monsters[ws.id];if(rooms[ws.room].players){const i=rooms[ws.room].players.indexOf(ws);if(i>=0)rooms[ws.room].players.splice(i,1)}}}});
+  ws.on('close',()=>{
+    if(ws.room&&rooms[ws.room]){
+      delete rooms[ws.room].monsters[ws.id];
+      var p=rooms[ws.room].players;
+      if(p){var i=p.indexOf(ws);if(i>=0)p.splice(i,1)}
+    }
+  });
 });
 server.listen(process.env.PORT||3000);
