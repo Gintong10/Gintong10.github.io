@@ -2,7 +2,7 @@ const http = require('http'), WebSocket = require('ws'), fs = require('fs');
 const rooms = {};
 const MAX_PLAYERS = 6;
 const ARENA_W = 640, ARENA_H = 480;
-const MAX_HP = 150, BASE_SIZE = 30, MIN_SPEED = 0.6, MAX_VEL = 4;
+const MAX_HP = 150, BASE_SIZE = 30, MIN_SPEED = 1, MAX_VEL = 6;
 function code() { var s = ''; for (var i = 0; i < 4; i++)s += 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random() * 24 | 0]; return s }
 const server = http.createServer((req, res) => {
   const u = req.url.split('?')[0];
@@ -29,11 +29,18 @@ function startArena(roomCode) {
   for (const pid of Object.keys(r.monsterData)) {
     const m = r.monsterData[pid];
     const hp = Math.min(MAX_HP, Math.max(60, Math.floor(m.a / 25)));
+    // Position monsters and aim them towards center
+    const px = r.arenaL + 80 + Math.random() * (ARENA_W - 160);
+    const py = r.arenaT + 60 + Math.random() * (ARENA_H - 120);
+    const cx = ARENA_W / 2, cy = ARENA_H / 2;
+    const dx = cx - px, dy = cy - py;
+    const dist = Math.hypot(dx, dy) || 1;
     r.monsters[pid] = {
-      x: r.arenaL + 80 + Math.random() * (ARENA_W - 160), y: r.arenaT + 60 + Math.random() * (ARENA_H - 120),
-      vx: (Math.random() - 0.5) * 1.2, vy: (Math.random() - 0.5) * 1.2,
+      x: px, y: py,
+      vx: (dx / dist) * 1.5 + (Math.random() - 0.5) * 0.3,
+      vy: (dy / dist) * 1.5 + (Math.random() - 0.5) * 0.3,
       path: m.p, name: m.n || '???', baseSize: BASE_SIZE, size: BASE_SIZE, hp: hp, maxHp: hp, iframes: 0,
-      spikes: Math.min(m.c, 5), stability: Math.min(m.s * 3, 2), baseSpeed: 0.6 + Math.min(m.l * 0.1, 0.4), speed: 0,
+      spikes: Math.min(m.c, 5), stability: Math.min(m.s * 3, 2), baseSpeed: 1.0 + Math.min(m.l * 0.15, 0.5), speed: 0,
       color: r.colors[pid] || '#9b59b6'
     };
     r.monsters[pid].speed = Math.max(MIN_SPEED, r.monsters[pid].baseSpeed);
@@ -110,11 +117,17 @@ function tick(roomCode) {
     if (r.arenaB - r.arenaT < 150) { r.arenaT = (r.arenaT + r.arenaB) / 2 - 75; r.arenaB = r.arenaT + 150 }
     logs.push('Arena shrinks!');
     for (const id of Object.keys(r.monsters)) clampBounds(r.monsters[id], r);
+    // Remove health packs outside new bounds
+    for (let pi = r.packs.length - 1; pi >= 0; pi--) {
+      const pk = r.packs[pi];
+      if (pk.x < r.arenaL || pk.x > r.arenaR || pk.y < r.arenaT || pk.y > r.arenaB) r.packs.splice(pi, 1);
+    }
   }
-  // Spawn health packs - faster with fewer alive players
+  // Spawn health packs - slower rate as arena shrinks
   var aliveCount = Object.keys(r.monsters).length;
-  var packRate = aliveCount <= 2 ? 300 : aliveCount <= 3 ? 500 : 935;
-  if (r.tick % packRate === 0 && r.packs.length < 3) spawnPack(r);
+  var phase = Math.floor(r.tick / 625);
+  var packRate = (aliveCount <= 2 ? 450 : aliveCount <= 3 ? 750 : 1200) + phase * 100;
+  if (r.tick % packRate === 0 && r.packs.length < 2) spawnPack(r);
   // Process new blasts -> convert to active blast accelerations
   var blastFx = [];
   if (r.blasts && r.blasts.length) {
@@ -158,12 +171,14 @@ function tick(roomCode) {
     // Cap velocity
     const v = Math.hypot(m.vx, m.vy); if (v > MAX_VEL) { m.vx = m.vx / v * MAX_VEL; m.vy = m.vy / v * MAX_VEL }
   }
-  // Health pack pickup
+  // Health pack pickup - check if pack is inside shape polygon
   for (const id of Object.keys(r.monsters)) {
     const m = r.monsters[id];
+    const v = verts(m);
     for (let pi = r.packs.length - 1; pi >= 0; pi--) {
       const pk = r.packs[pi];
-      if (Math.hypot(m.x - pk.x, m.y - pk.y) < m.size + 25) {
+      // Check if health pack center is inside monster polygon
+      if (ptInPoly(pk.x, pk.y, v)) {
         m.hp = Math.min(m.maxHp, m.hp + pk.hp);
         logs.push(m.name + ' +' + pk.hp + 'hp!');
         r.packs.splice(pi, 1);
