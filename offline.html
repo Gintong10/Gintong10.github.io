@@ -160,7 +160,7 @@
         <p id=drawStatus style="margin:4px;color:#888">Draw your monster</p>
         <canvas id=c width=300 height=300></canvas>
         <p class=hint>Draw in ONE stroke. Shape will auto-close.</p>
-        <button id=clear>Clear</button><button id=done>Fight!</button>
+        <button id=clear>Clear</button><button id=loadScotty style="background:#c0392b">Load Scotty</button><button id=done>Fight!</button>
     </div>
     <div id=arena>
         <canvas id=ac width=640 height=480></canvas>
@@ -511,20 +511,35 @@
             clearBtn.onclick = function () { path = []; var ctx = c.getContext('2d'); ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, 300, 300); document.getElementById('drawStatus').textContent = 'Draw your monster'; document.getElementById('drawStatus').style.color = '#888' };
             if (loadScottyBtn) loadScottyBtn.onclick = function () {
                 path = [
-                    { x: 280, y: 130 }, // Nose Tip
-                    { x: 280, y: 160 }, { x: 260, y: 190 }, { x: 245, y: 170 }, // Beard
-                    { x: 230, y: 200 }, // Chest
-                    { x: 230, y: 260 }, { x: 210, y: 260 }, { x: 210, y: 220 }, // Front Leg
-                    { x: 190, y: 220 }, { x: 130, y: 220 }, // Belly
-                    { x: 120, y: 260 }, { x: 90, y: 260 }, { x: 90, y: 210 }, // Back Leg
-                    { x: 60, y: 180 }, // Rump
-                    { x: 50, y: 130 }, { x: 45, y: 80 }, { x: 65, y: 120 }, // Tail
-                    { x: 90, y: 130 }, { x: 190, y: 130 }, // Back
-                    { x: 195, y: 70 }, { x: 205, y: 40 }, { x: 215, y: 70 }, // Ear Back
-                    { x: 220, y: 70 }, { x: 230, y: 40 }, { x: 240, y: 70 }, // Ear Front
-                    { x: 250, y: 90 }, // Forehead
-                    { x: 255, y: 110 }, // Stop
-                    { x: 280, y: 110 }  // Snout Top
+                    { x: 270, y: 115 },  // Nose tip
+                    { x: 255, y: 105 },  // Top of muzzle
+                    { x: 248, y: 92 },   // Forehead
+                    { x: 240, y: 58 },   // Front ear outer
+                    { x: 232, y: 46 },   // Front ear tip
+                    { x: 225, y: 65 },   // Front ear inner
+                    { x: 218, y: 72 },   // Between ears
+                    { x: 212, y: 65 },   // Back ear inner
+                    { x: 205, y: 46 },   // Back ear tip
+                    { x: 198, y: 70 },   // Back ear outer
+                    { x: 192, y: 100 },  // Back of skull
+                    { x: 186, y: 118 },  // Neck
+                    { x: 110, y: 125 },  // Back topline
+                    { x: 78, y: 118 },   // Before tail
+                    { x: 58, y: 68 },    // Tail tip
+                    { x: 64, y: 105 },   // Tail back edge
+                    { x: 68, y: 148 },   // Rump
+                    { x: 76, y: 188 },   // Upper hind leg
+                    { x: 80, y: 228 },   // Hind foot back
+                    { x: 102, y: 228 },  // Hind foot front
+                    { x: 108, y: 198 },  // Hind leg top
+                    { x: 198, y: 195 },  // Belly / skirt
+                    { x: 215, y: 205 },  // Front leg back
+                    { x: 220, y: 228 },  // Front foot back
+                    { x: 240, y: 228 },  // Front foot front
+                    { x: 242, y: 192 },  // Chest lower
+                    { x: 250, y: 165 },  // Chest
+                    { x: 262, y: 152 },  // Beard lower
+                    { x: 272, y: 135 },  // Under chin
                 ];
                 // Skip smoothing
                 path.push({ x: path[0].x, y: path[0].y });

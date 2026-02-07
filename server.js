@@ -6,6 +6,7 @@ const MAX_HP = 150, BASE_SIZE = 30, MIN_SPEED = 0.6, MAX_VEL = 4;
 function code() { var s = ''; for (var i = 0; i < 4; i++)s += 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random() * 24 | 0]; return s }
 const server = http.createServer((req, res) => {
   const u = req.url.split('?')[0];
+  if (u === '/healthz') { res.writeHead(200); res.end('ok'); return }
   if (u === '/' || u === '/index.html' || u.startsWith('/join/')) { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(fs.readFileSync('index.html', 'utf8')); return }
   res.writeHead(404); res.end();
 });
@@ -531,4 +532,5 @@ wss.on('connection', ws => {
   });
 });
 setInterval(() => { for (const c of Object.keys(rooms)) tick(c) }, 16);
-server.listen(process.env.PORT || 3000);
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, '0.0.0.0', () => { console.log('Server listening on port ' + PORT) });
