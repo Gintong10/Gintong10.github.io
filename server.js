@@ -2,7 +2,7 @@ const http = require('http'), WebSocket = require('ws'), fs = require('fs');
 const rooms = {};
 const MAX_PLAYERS = 6;
 const ARENA_W = 640, ARENA_H = 480;
-const MAX_HP = 150, BASE_SIZE = 30, MIN_SPEED = 1, MAX_VEL = 6;
+const MAX_HP = 150, BASE_SIZE = 30, MIN_SPEED = 0.6, MAX_VEL = 4;
 function code() { var s = ''; for (var i = 0; i < 4; i++)s += 'ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random() * 24 | 0]; return s }
 const server = http.createServer((req, res) => {
   const u = req.url.split('?')[0];
@@ -54,9 +54,16 @@ function startArena(roomCode) {
   if (!r || r.started) return;
   r.started = true;
   r.monsters = {}; r.tick = 0; r.arenaL = 0; r.arenaT = 0; r.arenaR = ARENA_W; r.arenaB = ARENA_H;
-  r.packs = []; r.blasts = []; r.powerups = []; r.hazards = []; r.floatTexts = []; r.kills = [];
+  r.packs = []; r.blasts = []; r.powerups = []; r.hazards = []; r.floatTexts = []; r.kills = []; r.particles = [];
   r.suddenDeath = false;
-  for (const pid of Object.keys(r.monsterData)) {
+
+  // Team mode: assign teams if 4+ players
+  const pids = Object.keys(r.monsterData);
+  const teamMode = pids.length >= 4;
+  r.teamMode = teamMode;
+
+  for (let ti = 0; ti < pids.length; ti++) {
+    const pid = pids[ti];
     const m = r.monsterData[pid];
     const hp = Math.min(MAX_HP, Math.max(60, Math.floor(m.a / 25)));
     // Position monsters and aim them towards center
@@ -66,13 +73,16 @@ function startArena(roomCode) {
     const dx = cx - px, dy = cy - py;
     const dist = Math.hypot(dx, dy) || 1;
     const ability = detectAbility(m);
+    // Team assignment: alternating red/blue
+    const team = teamMode ? (ti % 2 === 0 ? 'red' : 'blue') : null;
+    const teamColor = team === 'red' ? '#e74c3c' : team === 'blue' ? '#3498db' : r.colors[pid] || '#9b59b6';
     r.monsters[pid] = {
       x: px, y: py,
       vx: (dx / dist) * 1.5 + (Math.random() - 0.5) * 0.3,
       vy: (dy / dist) * 1.5 + (Math.random() - 0.5) * 0.3,
       path: m.p, name: m.n || '???', baseSize: BASE_SIZE, size: BASE_SIZE, hp: hp, maxHp: hp, iframes: 0,
       spikes: Math.min(m.c, 5), stability: Math.min(m.s * 3, 2), baseSpeed: 1.0 + Math.min(m.l * 0.15, 0.5), speed: 0,
-      color: r.colors[pid] || '#9b59b6',
+      color: teamColor, team: team,
       // New properties
       ability: ability, abilityCooldown: 0,
       effects: {}, // { speed: ticksLeft, shield: ticksLeft, etc }
@@ -321,6 +331,8 @@ function tick(roomCode) {
       if (!a || !b) continue;
       // Ghost effect: pass through
       if (a.effects.ghost || b.effects.ghost) continue;
+      // Team mode: teammates don't collide for damage
+      const sameTeam = r.teamMode && a.team && b.team && a.team === b.team;
       if (!polyOverlap(a, b)) continue;
       const dx = b.x - a.x, dy = b.y - a.y, dist = Math.hypot(dx, dy) || 0.1;
       const nx = dx / dist, ny = dy / dist;
@@ -331,13 +343,20 @@ function tick(roomCode) {
       const sep = (a.size + b.size) * 0.1;
       a.x -= nx * sep; a.y -= ny * sep; b.x += nx * sep; b.y += ny * sep;
       clampBounds(a, r); clampBounds(b, r);
-      // Damage only if no iframes, check shield
-      if (a.iframes <= 0 && b.iframes <= 0) {
-        const dmgA = a.effects.shield ? 0 : Math.min(15, Math.max(1, Math.round((b.spikes - a.stability) * 3 * (b.effects.damage ? 2 : 1))));
-        const dmgB = b.effects.shield ? 0 : Math.min(15, Math.max(1, Math.round((a.spikes - b.stability) * 3 * (a.effects.damage ? 2 : 1))));
+      // Damage only if no iframes, check shield, skip if same team
+      if (a.iframes <= 0 && b.iframes <= 0 && !sameTeam) {
+        // Velocity-based damage multiplier (only at high speeds, vel > 2.5)
+        const velA = Math.hypot(a.vx, a.vy);
+        const velB = Math.hypot(b.vx, b.vy);
+        const velMultA = velA > 2.5 ? 1 + (velA - 2.5) / 2 : 1; // 1x to 1.75x at max vel 4
+        const velMultB = velB > 2.5 ? 1 + (velB - 2.5) / 2 : 1;
+        const baseDmgA = (b.spikes - a.stability) * 3 * (b.effects.damage ? 2 : 1);
+        const baseDmgB = (a.spikes - b.stability) * 3 * (a.effects.damage ? 2 : 1);
+        const dmgA = a.effects.shield ? 0 : Math.min(25, Math.max(1, Math.round(baseDmgA * velMultB)));
+        const dmgB = b.effects.shield ? 0 : Math.min(25, Math.max(1, Math.round(baseDmgB * velMultA)));
         a.hp -= dmgA; b.hp -= dmgB; a.iframes = 20; b.iframes = 20;
-        if (dmgA > 0) r.floatTexts.push({ x: a.x, y: a.y - 20, text: '-' + dmgA, color: '#f55' });
-        if (dmgB > 0) r.floatTexts.push({ x: b.x, y: b.y - 20, text: '-' + dmgB, color: '#f55' });
+        if (dmgA > 0) r.floatTexts.push({ x: a.x, y: a.y - 20, text: '-' + dmgA + (velMultB > 1.2 ? '💨' : ''), color: velMultB > 1.2 ? '#ff0' : '#f55' });
+        if (dmgB > 0) r.floatTexts.push({ x: b.x, y: b.y - 20, text: '-' + dmgB + (velMultA > 1.2 ? '💨' : ''), color: velMultA > 1.2 ? '#ff0' : '#f55' });
         // Absorb ability: heal on hit
         if (a.ability === 'absorb' && dmgB > 0) a.hp = Math.min(a.maxHp, a.hp + Math.floor(dmgB / 2));
         if (b.ability === 'absorb' && dmgA > 0) b.hp = Math.min(b.maxHp, b.hp + Math.floor(dmgA / 2));
@@ -352,19 +371,49 @@ function tick(roomCode) {
       logs.push(dead.name + ' defeated!');
       r.floatTexts.push({ x: dead.x, y: dead.y, text: '💀', color: '#fff' });
       r.kills.push({ name: dead.name, x: dead.x, y: dead.y });
+      // Spawn death explosion particles
+      for (let pi = 0; pi < 12; pi++) {
+        const angle = Math.PI * 2 * pi / 12;
+        r.particles.push({ x: dead.x, y: dead.y, vx: Math.cos(angle) * 3, vy: Math.sin(angle) * 3, color: dead.color, age: 0 });
+      }
       delete r.monsters[id];
     }
   }
+  // Update particles
+  for (let pi = r.particles.length - 1; pi >= 0; pi--) {
+    const p = r.particles[pi];
+    p.x += p.vx; p.y += p.vy; p.vx *= 0.95; p.vy *= 0.95; p.age++;
+    if (p.age > 30) r.particles.splice(pi, 1);
+  }
+
+  // Win condition
   const alive = Object.keys(r.monsters);
-  if (alive.length <= 1 && !r.done) {
-    if (alive.length === 1) logs.push(r.monsters[alive[0]].name + ' wins!');
-    else if (alive.length === 0) logs.push('Draw!');
+  let gameOver = false;
+  if (r.teamMode) {
+    // Team mode: check if only one team remains
+    const teamsAlive = new Set();
+    for (const id of alive) if (r.monsters[id].team) teamsAlive.add(r.monsters[id].team);
+    if (teamsAlive.size <= 1 && !r.done) {
+      if (teamsAlive.size === 1) {
+        const winTeam = [...teamsAlive][0];
+        logs.push('Team ' + winTeam.toUpperCase() + ' wins!');
+      } else logs.push('Draw!');
+      gameOver = true;
+    }
+  } else {
+    if (alive.length <= 1 && !r.done) {
+      if (alive.length === 1) logs.push(r.monsters[alive[0]].name + ' wins!');
+      else if (alive.length === 0) logs.push('Draw!');
+      gameOver = true;
+    }
+  }
+  if (gameOver && !r.done) {
     r.done = true;
     // Schedule restart after 4 seconds
     setTimeout(() => {
       if (!r || !rooms[roomCode]) return;
       r.started = false; r.done = false; r.monsters = null; r.packs = []; r.blasts = [];
-      r.powerups = []; r.hazards = []; r.floatTexts = []; r.kills = []; r.suddenDeath = false;
+      r.powerups = []; r.hazards = []; r.floatTexts = []; r.kills = []; r.suddenDeath = false; r.particles = [];
       // Keep monsterData so shapes are preserved, but clear ready state
       const saved = {}; for (const pid of Object.keys(r.monsterData)) saved[pid] = r.monsterData[pid];
       r.monsterData = {}; r.savedShapes = saved;
@@ -378,8 +427,9 @@ function tick(roomCode) {
     pk: r.packs, pu: r.powerups, hz: r.hazards,
     bl: blastFx.length ? blastFx : undefined,
     ft: floats.length ? floats : undefined,
+    pt: r.particles.length ? r.particles : undefined,
     lw: r.lightningWarning, ls: r.lightningStrike,
-    sd: r.suddenDeath,
+    sd: r.suddenDeath, tm: r.teamMode,
     log: logs.length ? logs : undefined
   });
   r.players.forEach(p => { if (p.readyState === 1) p.send(data) });
@@ -432,12 +482,21 @@ wss.on('connection', ws => {
           if (me.abilityCooldown > 0 || me.ability === 'none') return;
           me.abilityCooldown = 600; // 10 second cooldown
           if (me.ability === 'spikeBurst') {
+            // Calculate radius based on outermost vertex
+            const v = verts(me);
+            let maxDist = 0;
+            for (let i = 0; i < v.length; i++) {
+              const d = Math.hypot(v[i][0] - me.x, v[i][1] - me.y);
+              if (d > maxDist) maxDist = d;
+            }
+            const abilityRadius = Math.max(60, maxDist * 2);
+            me.abilityRadius = abilityRadius; // Store for client
             // AoE damage pulse
             for (const id of Object.keys(r.monsters)) {
               if (id == ws.id) continue;
               const other = r.monsters[id];
               const dist = Math.hypot(other.x - me.x, other.y - me.y);
-              if (dist < 100 && !other.effects.shield) {
+              if (dist < abilityRadius && !other.effects.shield) {
                 other.hp -= 20;
                 r.floatTexts.push({ x: other.x, y: other.y - 20, text: '-20💥', color: '#f00' });
               }

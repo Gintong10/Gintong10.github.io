@@ -147,7 +147,7 @@
 <body>
     <div id=lobby>
         <h1>Shadow Puppet Arena</h1>
-        <p style=margin:8px>Draw a monster. Up to 6 players!</p><button id=create>Create Game</button><br><input id=code
+        <p style=margin:8px>Draw a shape. Up to 6 players!</p><button id=create>Create Game</button><br><input id=code
             placeholder="Room code" maxlength=4 style=text-transform:uppercase><button id=join>Join</button>
         <div id=qr></div>
         <p id=msg style=margin-top:15px;color:#888>Connecting...</p>
@@ -155,7 +155,7 @@
     <div id=ui style=display:none>
         <p id=room>Room: ---</p>
         <div id=qrDraw></div>
-        <p id=count></p><input id=mname placeholder="Name your monster" maxlength=12><br><canvas id=c width=300
+        <p id=count></p><input id=mname placeholder="Name your shape" maxlength=12><br><canvas id=c width=300
             height=300></canvas>
         <p class=hint>Draw in ONE stroke. Shape will auto-close.</p>
         <p id=drawStatus style=margin:4px>Draw your monster</p><button id=loadPrev
@@ -164,15 +164,15 @@
     </div>
     <div id=arena><canvas id=ac width=640 height=480></canvas>
         <div style="margin:4px"><button id=blastBtn>Blast (ready)</button><button id=abilityBtn
-                style=background:#9b59b6>Ability</button></div>
+                style="background:#9b59b6;min-width:100px;font-size:12px">Ability</button></div>
         <div id=log></div>
     </div>
     <script>
         (function () {
             var lobby = document.getElementById('lobby'), ui = document.getElementById('ui'), arena = document.getElementById('arena'), c = document.getElementById('c'), ac = document.getElementById('ac'), msg = document.getElementById('msg'), room = document.getElementById('room'), count = document.getElementById('count'), qr = document.getElementById('qr'), done = document.getElementById('done'), unready = document.getElementById('unready'), log = document.getElementById('log'), blastBtn = document.getElementById('blastBtn'), clearBtn = document.getElementById('clear'), loadPrevBtn = document.getElementById('loadPrev'), abilityBtn = document.getElementById('abilityBtn');
-            var W = 300, H = 300, path = [], playerId = 0, myColor = '#6a4c93', monsters = {}, packs = [], powerups = [], hazards = [], ws, isReady = false, bounds = [0, 0, 640, 480];
+            var W = 300, H = 300, path = [], playerId = 0, myColor = '#6a4c93', monsters = {}, packs = [], powerups = [], hazards = [], particles = [], ws, isReady = false, bounds = [0, 0, 640, 480];
             var blastCooldown = 0, abilityCooldown = 0, blastFx = [], floatTexts = [], isDead = false, hasSavedShape = false, savedPath = [];
-            var lightningWarning = null, lightningStrike = null, suddenDeath = false, myAbility = 'none';
+            var lightningWarning = null, lightningStrike = null, suddenDeath = false, myAbility = 'none', teamMode = false;
             var WS_URL = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + (location.host || 'localhost:3000');
             var retries = 0;
             function post(m) { msg.textContent = m; msg.style.color = '#888' }
@@ -189,14 +189,14 @@
                     else if (d.t === 'status') { count.textContent = d.ready + '/' + d.total + ' ready' }
                     else if (d.t === 'start') { lobby.style.display = 'none'; ui.style.display = 'block'; c.style.display = 'block'; playerId = d.id; if (d.color) myColor = d.color }
                     else if (d.t === 'arena') {
-                        monsters = d.m; packs = d.pk || []; powerups = d.pu || []; hazards = d.hz || [];
+                        monsters = d.m; packs = d.pk || []; powerups = d.pu || []; hazards = d.hz || []; particles = d.pt || [];
                         if (d.b) bounds = d.b;
                         if (d.bl) for (var bi = 0; bi < d.bl.length; bi++) blastFx.push({ x: d.bl[bi].x, y: d.bl[bi].y, age: 0 });
                         if (d.ft) for (var fi = 0; fi < d.ft.length; fi++) floatTexts.push({ x: d.ft[fi].x, y: d.ft[fi].y, text: d.ft[fi].text, color: d.ft[fi].color, age: 0 });
-                        lightningWarning = d.lw; lightningStrike = d.ls; suddenDeath = d.sd;
+                        lightningWarning = d.lw; lightningStrike = d.ls; suddenDeath = d.sd; teamMode = d.tm;
                         lobby.style.display = 'none'; ui.style.display = 'none'; arena.style.display = 'flex'; blastBtn.style.display = 'inline-block';
                         if (d.log) for (var i = 0; i < d.log.length; i++) addLog(d.log[i]);
-                        if (!monsters[playerId] && !isDead) { isDead = true; blastBtn.disabled = true; blastBtn.textContent = 'Dead'; blastBtn.style.background = '#333'; abilityBtn.disabled = true; }
+                        if (!monsters[playerId] && !isDead) { isDead = true; blastBtn.disabled = true; blastBtn.textContent = 'Dead'; blastBtn.style.background = '#333'; abilityBtn.disabled = true; abilityBtn.textContent = 'Dead'; abilityBtn.style.background = '#333'; }
                         else if (monsters[playerId]) { myAbility = monsters[playerId].ability || 'none'; abilityBtn.textContent = myAbility === 'none' ? 'No Ability' : myAbility.charAt(0).toUpperCase() + myAbility.slice(1); }
                         renderArena()
                     }
@@ -243,7 +243,8 @@
                 var ctx = ac.getContext('2d');
                 ctx.fillStyle = '#180818'; ctx.fillRect(0, 0, 640, 480);
                 ctx.fillStyle = '#0d0d12'; ctx.fillRect(bounds[0], bounds[1], bounds[2] - bounds[0], bounds[3] - bounds[1]);
-                ctx.strokeStyle = suddenDeath ? '#f00' : '#555'; ctx.lineWidth = suddenDeath ? 4 : 2; ctx.strokeRect(bounds[0], bounds[1], bounds[2] - bounds[0], bounds[3] - bounds[1]);
+                var isShrunk = bounds[0] > 0 || bounds[1] > 0 || bounds[2] < 640 || bounds[3] < 480;
+                ctx.strokeStyle = isShrunk ? '#ff0000' : '#555'; ctx.lineWidth = isShrunk ? 4 : 2; ctx.strokeRect(bounds[0], bounds[1], bounds[2] - bounds[0], bounds[3] - bounds[1]);
 
                 // Draw hazards
                 for (var hi = 0; hi < hazards.length; hi++) {
@@ -290,6 +291,16 @@
                     if (!m.path || !m.path.length) continue;
                     var sc = m.size / 40;
                     var pcx = 0, pcy = 0; for (var i = 0; i < m.path.length; i++) { pcx += m.path[i][0] * 12; pcy += m.path[i][1] * 12 } pcx /= m.path.length; pcy /= m.path.length;
+                    // Trail effect
+                    if (m.trail && m.trail.length > 1) {
+                        for (var ti = 0; ti < m.trail.length - 1; ti++) {
+                            var alpha = (ti / m.trail.length) * 0.4;
+                            ctx.globalAlpha = alpha;
+                            ctx.fillStyle = m.color;
+                            ctx.beginPath(); ctx.arc(m.trail[ti].x, m.trail[ti].y, m.size * 0.3 * (ti / m.trail.length), 0, Math.PI * 2); ctx.fill();
+                        }
+                        ctx.globalAlpha = 1;
+                    }
                     // Effect glow
                     if (m.effects && (m.effects.speed || m.effects.shield || m.effects.damage || m.effects.ghost)) {
                         ctx.save(); ctx.globalAlpha = 0.4;
@@ -305,8 +316,18 @@
                     ctx.restore();
                     ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.max(10, Math.round(12 * sc)) + 'px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                     ctx.fillText(Math.ceil(m.hp), m.x, m.y);
-                    if (m.name) { ctx.font = Math.max(9, Math.round(10 * sc)) + 'px sans-serif'; ctx.fillText(m.name, m.x, m.y - m.size * 1.5 - 6) }
+                    var teamLabel = teamMode && m.team ? '[' + m.team.charAt(0).toUpperCase() + '] ' : '';
+                    if (m.name) { ctx.font = Math.max(9, Math.round(10 * sc)) + 'px sans-serif'; ctx.fillText(teamLabel + m.name, m.x, m.y - m.size * 1.5 - 6) }
                 }
+                // Death explosion particles
+                for (var pi = 0; pi < particles.length; pi++) {
+                    var p = particles[pi];
+                    var alpha = Math.max(0, 1 - p.age / 30);
+                    ctx.globalAlpha = alpha;
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
+                }
+                ctx.globalAlpha = 1;
                 // Blast effects
                 for (var bi = blastFx.length - 1; bi >= 0; bi--) {
                     var bf = blastFx[bi]; bf.age++;
@@ -335,13 +356,13 @@
                 hasSavedShape = false; savedPath = path.slice(); ws.send(JSON.stringify({ t: 'monster', m: s })); isReady = true; done.style.display = 'none'; unready.style.display = 'inline-block'; loadPrevBtn.style.display = 'none'; document.getElementById('drawStatus').textContent = 'Ready! Waiting for others...'
             };
             unready.onclick = function () {
-                ws.send(JSON.stringify({ t: 'unready' })); isReady = false; unready.style.display = 'none'; done.style.display = 'inline-block'; document.getElementById('drawStatus').textContent = 'Draw your monster'
+                ws.send(JSON.stringify({ t: 'unready' })); isReady = false; unready.style.display = 'none'; done.style.display = 'inline-block'; document.getElementById('drawStatus').textContent = 'Draw your shape'
             };
             clearBtn.onclick = function () {
                 if (isReady) return;
                 path = [];
                 var ctx = c.getContext('2d'); ctx.fillStyle = '#1a1a24'; ctx.fillRect(0, 0, W, H);
-                document.getElementById('drawStatus').textContent = 'Draw your monster'; document.getElementById('drawStatus').style.color = '#888'
+                document.getElementById('drawStatus').textContent = 'Draw your shape'; document.getElementById('drawStatus').style.color = '#888'
             };
             loadPrevBtn.onclick = function () {
                 if (isReady || savedPath.length < 10) return;
