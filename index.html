@@ -74,7 +74,7 @@ var m=monsters[id];
 if(!m.path||!m.path.length)continue;
 var sc=m.size/40;
 var pcx=0,pcy=0;for(var i=0;i<m.path.length;i++){pcx+=m.path[i][0]*12;pcy+=m.path[i][1]*12}pcx/=m.path.length;pcy/=m.path.length;
-ctx.save();ctx.translate(m.x,m.y);ctx.scale(sc,sc);
+ctx.save();ctx.translate(m.x,m.y);ctx.rotate(m.rot||0);ctx.scale(sc,sc);
 ctx.fillStyle=m.color;ctx.beginPath();
 ctx.moveTo((m.path[0][0]*12-pcx),(m.path[0][1]*12-pcy));
 for(var i=1;i<m.path.length;i++)ctx.lineTo((m.path[i][0]*12-pcx),(m.path[i][1]*12-pcy));

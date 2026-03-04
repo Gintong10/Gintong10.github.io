@@ -2,7 +2,7 @@ const http=require('http'),WebSocket=require('ws'),fs=require('fs');
 const rooms={};
 const MAX_PLAYERS=6;
 const ARENA_W=640,ARENA_H=480;
-const MAX_HP=150,BASE_SIZE=30,MIN_SPEED=0.6,MAX_VEL=4;
+const MAX_HP=150,BASE_SIZE=30,MIN_SPEED=0.6,MAX_VEL=4,MAX_VROT=0.08;
 function code(){var s='';for(var i=0;i<4;i++)s+='ABCDEFGHJKLMNPQRSTUVWXYZ'[Math.random()*24|0];return s}
 const server=http.createServer((req,res)=>{
   const u=req.url.split('?')[0];
@@ -31,7 +31,7 @@ function startArena(roomCode){
     const hp=Math.min(MAX_HP,Math.max(60,Math.floor(m.a/25)));
     r.monsters[pid]={
       x:r.arenaL+80+Math.random()*(ARENA_W-160),y:r.arenaT+60+Math.random()*(ARENA_H-120),
-      vx:(Math.random()-0.5)*1.2,vy:(Math.random()-0.5)*1.2,
+      vx:(Math.random()-0.5)*1.2,vy:(Math.random()-0.5)*1.2,rot:0,vr:(Math.random()-0.5)*0.02,
       path:m.p,name:m.n||'???',baseSize:BASE_SIZE,size:BASE_SIZE,hp:hp,maxHp:hp,iframes:0,
       spikes:Math.min(m.c,5),stability:Math.min(m.s*3,2),baseSpeed:0.6+Math.min(m.l*0.1,0.4),speed:0,
       color:r.colors[pid]||'#9b59b6'
@@ -41,12 +41,15 @@ function startArena(roomCode){
   spawnPack(r);spawnPack(r);
 }
 function verts(m){
-  const s=m.size/40;let cx=0,cy=0;
+  const s=m.size/40,cos=Math.cos(m.rot||0),sin=Math.sin(m.rot||0);
+  let cx=0,cy=0;
   for(let i=0;i<m.path.length;i++){cx+=m.path[i][0]*12;cy+=m.path[i][1]*12}
   cx/=m.path.length;cy/=m.path.length;
   const o=[];
-  for(let i=0;i<m.path.length;i++)
-    o.push([m.x+(m.path[i][0]*12-cx)*s,m.y+(m.path[i][1]*12-cy)*s]);
+  for(let i=0;i<m.path.length;i++){
+    const lx=(m.path[i][0]*12-cx)*s,ly=(m.path[i][1]*12-cy)*s;
+    o.push([m.x+lx*cos-ly*sin,m.y+lx*sin+ly*cos]);
+  }
   return o;
 }
 function ptInPoly(px,py,v){
@@ -67,10 +70,10 @@ function clampBounds(m,r){
   const v=verts(m);
   let mnX=Infinity,mxX=-Infinity,mnY=Infinity,mxY=-Infinity;
   for(let i=0;i<v.length;i++){mnX=Math.min(mnX,v[i][0]);mxX=Math.max(mxX,v[i][0]);mnY=Math.min(mnY,v[i][1]);mxY=Math.max(mxY,v[i][1])}
-  if(mnX<r.arenaL){m.x+=r.arenaL-mnX;m.vx=Math.abs(m.vx)+0.1}
-  if(mxX>r.arenaR){m.x-=mxX-r.arenaR;m.vx=-(Math.abs(m.vx)+0.1)}
-  if(mnY<r.arenaT){m.y+=r.arenaT-mnY;m.vy=Math.abs(m.vy)+0.1}
-  if(mxY>r.arenaB){m.y-=mxY-r.arenaB;m.vy=-(Math.abs(m.vy)+0.1)}
+  if(mnX<r.arenaL){m.x+=r.arenaL-mnX;m.vx=Math.abs(m.vx)+0.1;m.vr=(m.vr||0)+0.01}
+  if(mxX>r.arenaR){m.x-=mxX-r.arenaR;m.vx=-(Math.abs(m.vx)+0.1);m.vr=(m.vr||0)-0.01}
+  if(mnY<r.arenaT){m.y+=r.arenaT-mnY;m.vy=Math.abs(m.vy)+0.1;m.vr=(m.vr||0)+0.01}
+  if(mxY>r.arenaB){m.y-=mxY-r.arenaB;m.vy=-(Math.abs(m.vy)+0.1);m.vr=(m.vr||0)-0.01}
 }
 
 function tick(roomCode){
@@ -96,7 +99,7 @@ function tick(roomCode){
   }
   // Spawn health packs - faster with fewer alive players
   var aliveCount=Object.keys(r.monsters).length;
-  var packRate=aliveCount<=2?300:aliveCount<=3?500:935;
+  var packRate=aliveCount<=2?600:aliveCount<=3?1000:1870;
   if(r.tick%packRate===0&&r.packs.length<3)spawnPack(r);
   // Process new blasts -> convert to active blast accelerations
   var blastFx=[];
@@ -137,6 +140,10 @@ function tick(roomCode){
     if(curV<MIN_SPEED&&curV>0.01){m.vx=m.vx/curV*MIN_SPEED;m.vy=m.vy/curV*MIN_SPEED}
     else if(curV<=0.01){var a=Math.random()*Math.PI*2;m.vx=Math.cos(a)*MIN_SPEED;m.vy=Math.sin(a)*MIN_SPEED}
     m.x+=m.vx*m.speed;m.y+=m.vy*m.speed;
+    // Rotation
+    if(m.vr===undefined)m.vr=0;if(m.rot===undefined)m.rot=0;
+    m.rot+=m.vr;if(m.vr>MAX_VROT)m.vr=MAX_VROT;if(m.vr<-MAX_VROT)m.vr=-MAX_VROT;
+    m.vr*=0.98;
     clampBounds(m,r);
     // Cap velocity
     const v=Math.hypot(m.vx,m.vy);if(v>MAX_VEL){m.vx=m.vx/v*MAX_VEL;m.vy=m.vy/v*MAX_VEL}
@@ -166,6 +173,9 @@ function tick(roomCode){
       const push=Math.max(0.15,(a.spikes-b.stability+b.spikes-a.stability)*0.08);
       a.vx-=nx*push;a.vy-=ny*push;
       b.vx+=nx*push;b.vy+=ny*push;
+      // Angular impulse from collision offset
+      var cross=(dx*a.vy-dy*a.vx);a.vr+=(cross>0?1:-1)*0.005;
+      cross=(dx*b.vy-dy*b.vx);b.vr+=(cross>0?-1:1)*0.005;
       const sep=(a.size+b.size)*0.1;
       a.x-=nx*sep;a.y-=ny*sep;b.x+=nx*sep;b.y+=ny*sep;
       clampBounds(a,r);clampBounds(b,r);
